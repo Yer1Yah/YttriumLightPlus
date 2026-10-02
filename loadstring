@@ -1,0 +1,1 @@
+script_key = "KEY-HERE"; loadstring(game:HttpGet('https://raw.githubusercontent.com/Yer1Yah/YttriumLightPlus/main/init.lua'), 'init.lua')({})
