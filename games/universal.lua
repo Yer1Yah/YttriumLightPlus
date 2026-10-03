@@ -1369,6 +1369,8 @@ run(function()
 	local Targets
 	local ShootDelay
 	local Distance
+	local ShowTarget, TargetColor, BoxAnim, AnimSpeed
+	local TargetBox
 	local rayCheck, delayCheck = RaycastParams.new(), tick()
 	
 	local function getTriggerBotTarget()
@@ -1386,13 +1388,43 @@ run(function()
 		end
 	end
 	
+
+	-- Visual only: draws an optional highlight box on whoever is in the crosshair.
+	-- It never changes who is targeted or when shots are fired.
+	local function updateHighlight(hit)
+		if not TargetBox then return end
+		if not (ShowTarget.Enabled and hit and hit.RootPart) then
+			TargetBox.Adornee = nil
+			return
+		end
+
+		local t = tick() * AnimSpeed.Value
+		local mode = BoxAnim.Value
+		local size, offset = Vector3.new(3, 5, 3), CFrame.new(0, -0.5, 0)
+		if mode == 'Pulse' then
+			size *= 1 + (math.sin(t * 4) * 0.12)
+		elseif mode == 'Bounce' then
+			offset = CFrame.new(0, -0.5 + (math.abs(math.sin(t * 3)) * 0.5), 0)
+		elseif mode == 'Spin' then
+			offset = CFrame.new(0, -0.5, 0) * CFrame.Angles(0, t * 3, 0)
+		end
+
+		TargetBox.Adornee = hit.RootPart
+		TargetBox.Size = size
+		TargetBox.CFrame = offset
+		TargetBox.Color3 = Color3.fromHSV(TargetColor.Hue, TargetColor.Sat, TargetColor.Value)
+		TargetBox.Transparency = 1 - TargetColor.Opacity
+	end
+
 	TriggerBot = vape.Categories.Combat:CreateModule({
 		Name = 'TriggerBot',
 		Function = function(callback)
 			if callback then
 				repeat
+					local hit = getTriggerBotTarget()
+					updateHighlight(hit)
 					if mouse1click and (isrbxactive or iswindowactive)() then
-						if getTriggerBotTarget() and canClick() then
+						if hit and canClick() then
 							if delayCheck < tick() then
 								if mouseClicked then
 									mouse1release()
@@ -1413,6 +1445,7 @@ run(function()
 					task.wait()
 				until not TriggerBot.Enabled
 			else
+				updateHighlight(nil)
 				if mouse1click and (isrbxactive or iswindowactive)() then
 					if mouseClicked then
 						mouse1release()
@@ -1445,6 +1478,49 @@ run(function()
 		Suffix = function(val)
 			return val == 1 and 'stud' or 'studs'
 		end
+	})
+	ShowTarget = TriggerBot:CreateToggle({
+		Name = 'Show target',
+		Tooltip = 'Highlights the player in your crosshair (visual only)',
+		Function = function(callback)
+			TargetColor.Object.Visible = callback
+			BoxAnim.Object.Visible = callback
+			AnimSpeed.Object.Visible = callback
+			if callback then
+				TargetBox = Instance.new('BoxHandleAdornment')
+				TargetBox.Adornee = nil
+				TargetBox.AlwaysOnTop = true
+				TargetBox.Size = Vector3.new(3, 5, 3)
+				TargetBox.CFrame = CFrame.new(0, -0.5, 0)
+				TargetBox.ZIndex = 0
+				TargetBox.Parent = vape.gui
+			elseif TargetBox then
+				TargetBox:Destroy()
+				TargetBox = nil
+			end
+		end
+	})
+	TargetColor = TriggerBot:CreateColorSlider({
+		Name = 'Target Color',
+		DefaultHue = 0.6,
+		DefaultOpacity = 0.5,
+		Darker = true,
+		Visible = false
+	})
+	BoxAnim = TriggerBot:CreateDropdown({
+		Name = 'Box Animation',
+		List = {'Static', 'Pulse', 'Bounce', 'Spin'},
+		Darker = true,
+		Visible = false
+	})
+	AnimSpeed = TriggerBot:CreateSlider({
+		Name = 'Animation Speed',
+		Min = 0.1,
+		Max = 3,
+		Decimal = 10,
+		Default = 1,
+		Darker = true,
+		Visible = false
 	})
 end)
 

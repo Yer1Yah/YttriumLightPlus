@@ -38279,27 +38279,29 @@ run(function()
     local VisualsModule
     local Lighting = game:GetService("Lighting")
 
-    -- Setup post-processing instances safely
-    local colorCorrection = Lighting:FindFirstChildOfClass("ColorCorrectionEffect")
-    if not colorCorrection then
-        colorCorrection = Instance.new("ColorCorrectionEffect")
-        colorCorrection.Name = "ClientShaderEffect"
-        colorCorrection.Parent = Lighting
+    -- Setup post-processing instances. We always create our own (never reuse the game's)
+    -- and keep them DISABLED until the Shader module is switched on, otherwise Roblox's
+    -- defaults (e.g. Depth of Field) would blur everything in the distance on load.
+    local function makeEffect(class, name)
+        local old = Lighting:FindFirstChild(name)
+        if old then old:Destroy() end
+        local effect = Instance.new(class)
+        effect.Name = name
+        effect.Enabled = false
+        effect.Parent = Lighting
+        return effect
     end
 
-    local bloom = Lighting:FindFirstChildOfClass("BloomEffect")
-    if not bloom then
-        bloom = Instance.new("BloomEffect")
-        bloom.Name = "ClientBloomEffect"
-        bloom.Parent = Lighting
-    end
+    local colorCorrection = makeEffect("ColorCorrectionEffect", "YttriumShaderColor")
+    local bloom = makeEffect("BloomEffect", "YttriumShaderBloom")
+    local depthOfField = makeEffect("DepthOfFieldEffect", "YttriumShaderDoF")
 
-    local depthOfField = Lighting:FindFirstChildOfClass("DepthOfFieldEffect")
-    if not depthOfField then
-        depthOfField = Instance.new("DepthOfFieldEffect")
-        depthOfField.Name = "ClientDoFEffect"
-        depthOfField.Parent = Lighting
-    end
+    -- Remove our effects entirely when the script unloads so nothing lingers in Lighting.
+    vape:Clean(function()
+        for _, effect in {colorCorrection, bloom, depthOfField} do
+            pcall(function() effect:Destroy() end)
+        end
+    end)
 
     local origTechnology = Lighting.Technology
     local origAmbient = Lighting.Ambient
@@ -38436,6 +38438,7 @@ run(function()
     -- Depth of Field Controls
     VisualsModule.DoFToggle = VisualsModule:CreateToggle({
         Name = 'Enable Depth of Field',
+        Tooltip = 'Blurs the distance. Off by default.',
         Default = false,
         Function = function() end
     })

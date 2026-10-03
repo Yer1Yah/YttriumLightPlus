@@ -183,6 +183,7 @@ end
 local glowconfig = {Enabled = true, Speed = 1, Intensity = 1}
 mainapi.GlowConfig = glowconfig
 local glowlist = {}
+local glowlast = 0
 local glowconn
 
 local function glowStep()
@@ -195,7 +196,11 @@ local function glowStep()
 		return
 	end
 	if not glowconfig.Enabled then return end
-	local t = os.clock() * glowconfig.Speed
+	-- ~40 updates/sec is visually identical for a soft pulse and halves the per-frame cost
+	local now = os.clock()
+	if now - glowlast < 0.025 then return end
+	glowlast = now
+	local t = now * glowconfig.Speed
 	local inten = glowconfig.Intensity
 	local guivisible = clickgui and clickgui.Visible
 	for i = #glowlist, 1, -1 do
@@ -206,8 +211,12 @@ local function glowStep()
 			local pulse = 0.5 + 0.5 * math.sin(t * 2.4 + rec.phase)
 			local flash = math.max(0, math.sin(t * 0.75 + rec.phase * 1.7)) ^ 14
 			local bright = math.clamp((0.55 * pulse + 0.45 * flash) * inten, 0, 1)
-			rec.core.Transparency = 0.55 - 0.5 * bright
-			rec.halo.Transparency = math.clamp(0.94 - 0.4 * bright, 0, 1)
+			local coreT = 0.55 - 0.5 * bright
+			if math.abs(coreT - (rec.lastT or -1)) > 0.004 then
+				rec.lastT = coreT
+				rec.core.Transparency = coreT
+				rec.halo.Transparency = math.clamp(0.94 - 0.4 * bright, 0, 1)
+			end
 			rec.grad.Rotation = (t * 45 + rec.phase * 40) % 360
 		end
 	end
